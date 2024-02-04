@@ -1,0 +1,18 @@
+/vendor/
+
+.env
+.env.local
+.env.*.local
+
+# Ignore IDE and editor-specific files
+/.idea/
+/.vscode/
+*.sublime-project
+*.sublime-workspace
+
+Thumbs.db
+.DS_Store
+
+.env.example
+
+!.gitignore
