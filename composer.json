@@ -1,5 +1,5 @@
 {
-    "name": "ananiaslitz/matrix",
+    "name": "opencodeco/matrix",
     "type": "library",
     "license": "MIT",
     "description": "A multi-tenant library for Hyperf APIs.",
@@ -23,14 +23,14 @@
 
     "autoload": {
         "psr-4": {
-            "Ananiaslitz\\Matrix\\": "src/"
+            "OpenCodeCo\\Matrix\\": "src/"
         }
     },
     "scripts": {
         "post-update-cmd": "php bin/hyperf.php matrix:publish",
         "post-install-cmd": "php bin/hyperf.php matrix:publish",
         "post-autoload-dump": [
-            "Ananiaslitz\\Matrix\\ComposerScripts::postAutoloadDump"
+            "OpenCodeCo\\Matrix\\ComposerScripts::postAutoloadDump"
         ]
     }
 }
