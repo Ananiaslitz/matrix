@@ -1,23 +1,17 @@
 <?php
 
-/**
- * Exception class to represent a Tenant not found error.
- *
- * This exception is thrown when a requested tenant cannot be found, typically used within a multi-tenant application to handle cases where a specific tenant is not available or does not exist.
- *
- * @package Ananiaslitz\Matrix\Exceptions
- */
+declare(strict_types=1);
+
 namespace Ananiaslitz\Matrix\Exceptions;
 
-class TenantNotFoundException extends \Exception implements \Throwable
+class TenantNotFoundException extends \RuntimeException implements \Throwable
 {
-    /**
-     * TenantNotFoundException constructor.
-     *
-     * @param \Throwable|null $previous The previous throwable used for chaining exceptions.
-     */
-    public function __construct(?\Throwable $previous = null)
+    public function __construct(string|int|null $tenantId = null, ?\Throwable $previous = null)
     {
-        parent::__construct("Tenant not found", 404, $previous);
+        $message = $tenantId !== null
+            ? "Tenant '{$tenantId}' not found."
+            : 'Tenant not found.';
+
+        parent::__construct($message, 404, $previous);
     }
 }

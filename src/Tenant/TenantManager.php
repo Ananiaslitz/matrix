@@ -1,95 +1,110 @@
 <?php
 
-/**
- * TenantManager class for managing tenant-specific database connections.
- *
- * The TenantManager class is responsible for handling tenant-specific database connections in a multi-tenant application. It provides methods for setting the database connection dynamically based on the tenant's details, reconnecting to the tenant's database, and retrieving tenant connection details.
- *
- * @package Ananiaslitz\Matrix\Tenant
- */
+declare(strict_types=1);
+
 namespace Ananiaslitz\Matrix\Tenant;
 
 use Hyperf\Contract\ConfigInterface;
-use Hyperf\Database\ConnectionResolverInterface;
 use Ananiaslitz\Matrix\Exceptions\TenantNotFoundException;
 use Ananiaslitz\Matrix\Model\Tenant;
 
+/**
+ * Manages tenant database connections in a coroutine-safe manner.
+ *
+ * Supports two isolation strategies:
+ *  - "database": each tenant has its own database (host, credentials can differ).
+ *  - "schema":   all tenants share the same database but use different schemas/prefixes.
+ *
+ * The active TenantData is stored per-coroutine via TenantContext so that
+ * concurrent requests never interfere with each other.
+ */
 class TenantManager
 {
-    /**
-     * The connection resolver instance used for managing database connections.
-     *
-     * @var ConnectionResolverInterface
-     */
-    private ConnectionResolverInterface $resolver;
-
-    /**
-     * The configuration interface for retrieving tenant-related settings.
-     *
-     * @var ConfigInterface
-     */
-    protected ConfigInterface $config;
-
-    /**
-     * TenantManager constructor.
-     *
-     * @param ConnectionResolverInterface $resolver The connection resolver instance.
-     * @param ConfigInterface $config The configuration interface.
-     */
     public function __construct(
-        ConnectionResolverInterface $resolver,
-        ConfigInterface $config
+        private readonly ConfigInterface $config,
     ) {
-        $this->resolver = $resolver;
-        $this->config = $config;
     }
 
     /**
-     * Set the database connection to match the specified tenant's connection.
-     *
-     * @param mixed $tenantId The identifier of the tenant whose connection should be set.
-     *
-     * @throws TenantNotFoundException If the specified tenant is not found.
+     * Resolve a Tenant model by ID, convert to TenantData, configure the
+     * dynamic connection and store it in the coroutine context.
      */
-    public function setTenantConnection(int $tenantId): void
+    public function setTenantById(int $tenantId): TenantData
     {
-        $details = $this->getTenantConnectionDetails($tenantId);
-
-        $this->config->set('databases.tenant', [
-            'driver' => $details['driver'],
-            'host' => $details['host'],
-            'database' => $details['database'],
-            'username' => $details['username'],
-            'password' => $details['password'],
-            'port' => $details['port'],
-        ]);
-
-        $this->resolver->connection('tenant')->reconnect();
-    }
-
-    /**
-     * Retrieve and return the connection details for the specified tenant.
-     *
-     * @param mixed $tenantId The identifier of the tenant.
-     *
-     * @return array The connection details for the specified tenant.
-     *
-     * @throws TenantNotFoundException If the specified tenant is not found.
-     */
-    protected function getTenantConnectionDetails($tenantId): array
-    {
+        /** @var Tenant|null $tenant */
         $tenant = Tenant::query()->find($tenantId);
 
         if (!$tenant) {
             throw new TenantNotFoundException($tenantId);
         }
 
-        return [
-            'host' => $tenant->host,
-            'database' => $tenant->database,
-            'username' => $tenant->username,
-            'password' => $tenant->password,
-            'port' => $tenant->port,
-        ];
+        return $this->setTenant($this->toTenantData($tenant));
+    }
+
+    /**
+     * Configure the dynamic connection from a TenantData and store it in
+     * the coroutine context for the duration of the current request.
+     */
+    public function setTenant(TenantData $tenantData): TenantData
+    {
+        $strategy = $this->config->get('matrix.strategy', 'database');
+
+        match ($strategy) {
+            'schema' => $this->applySchemaStrategy($tenantData),
+            default => $this->applyDatabaseStrategy($tenantData),
+        };
+
+        TenantContext::set($tenantData);
+
+        return $tenantData;
+    }
+
+    /**
+     * Return the current tenant from the coroutine context, or null if not set.
+     */
+    public function getCurrentTenant(): ?TenantData
+    {
+        return TenantContext::get();
+    }
+
+
+    /**
+     * Strategy: each tenant has dedicated database credentials.
+     * We register a named connection config for this tenant so that the
+     * Hyperf connection pool can create a pool keyed to this tenant.
+     */
+    private function applyDatabaseStrategy(TenantData $tenantData): void
+    {
+        $connectionName = $tenantData->connectionName();
+
+        $this->config->set("databases.{$connectionName}", $tenantData->toConnectionArray());
+    }
+
+    /**
+     * Strategy: all tenants share the same database server but use
+     * different schema prefixes (e.g. PostgreSQL search_path or a table prefix).
+     * We keep the base connection but override the prefix/search_path.
+     */
+    private function applySchemaStrategy(TenantData $tenantData): void
+    {
+        $baseName = $this->config->get('matrix.tenant_connection', 'tenant');
+        $baseConfig = $this->config->get("databases.{$baseName}", []);
+
+        $connectionName = $tenantData->connectionName();
+
+        $schemaConfig = array_merge($baseConfig, [
+            'prefix' => $tenantData->schemaPrefix . '_',
+            'search_path' => $tenantData->schemaPrefix,
+        ]);
+
+        $this->config->set("databases.{$connectionName}", $schemaConfig);
+    }
+
+    /**
+     * Map a Tenant Eloquent model to the TenantData value object.
+     */
+    private function toTenantData(Tenant $tenant): TenantData
+    {
+        return TenantData::fromModel($tenant);
     }
 }
