@@ -1,8 +1,14 @@
 {
-    "name": "opencodeco/matrix",
+    "name": "ananiaslitz/matrix",
     "type": "library",
     "license": "MIT",
     "description": "A multi-tenant library for Hyperf APIs.",
+    "keywords": [
+        "hyperf",
+        "multi-tenant",
+        "swoole",
+        "coroutine"
+    ],
     "authors": [
         {
             "name": "Diego Ananias",
@@ -10,27 +16,31 @@
         }
     ],
     "require": {
-        "php": "^8.0",
+        "php": "^8.1",
         "hyperf/database": "^3.0",
         "hyperf/di": "^3.0",
         "hyperf/command": "^3.0",
-        "hyperf/db-connection": "*"
+        "hyperf/db-connection": "^3.0",
+        "hyperf/context": "^3.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "^9.0",
-        "hyperf/testing": "^3.0"
+        "phpunit/phpunit": "^10.0",
+        "mockery/mockery": "^1.6",
+        "phpstan/phpstan": "^1.10"
     },
-
     "autoload": {
         "psr-4": {
-            "OpenCodeCo\\Matrix\\": "src/"
+            "Ananiaslitz\\Matrix\\": "src/"
         }
     },
-    "scripts": {
-        "post-update-cmd": "php bin/hyperf.php matrix:publish",
-        "post-install-cmd": "php bin/hyperf.php matrix:publish",
-        "post-autoload-dump": [
-            "OpenCodeCo\\Matrix\\ComposerScripts::postAutoloadDump"
-        ]
+    "autoload-dev": {
+        "psr-4": {
+            "Ananiaslitz\\Matrix\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "hyperf": {
+            "config": "Ananiaslitz\\Matrix\\ConfigProvider"
+        }
     }
 }

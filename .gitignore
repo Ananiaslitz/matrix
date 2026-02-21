@@ -1,4 +1,5 @@
 /vendor/
+composer.lock
 
 .env
 .env.local
@@ -14,6 +15,8 @@ Thumbs.db
 .DS_Store
 
 .env.example
+
+/sandbox
 
 !.gitignore
 
