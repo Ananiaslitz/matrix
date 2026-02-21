@@ -1,93 +1,93 @@
 <?php
 
-/**
- * Command class for publishing the necessary configurations for the Matrix library.
- *
- * This command allows users to publish the required configurations for the Matrix library. It copies migration files from the library to the user's project directory, enabling customization and usage.
- *
- * @package Ananiaslitz\Matrix\Console\Commands
- */
+declare(strict_types=1);
+
 namespace Ananiaslitz\Matrix\Console\Commands;
 
 use Hyperf\Command\Command as HyperfCommand;
+use Symfony\Component\Console\Input\InputOption;
 
 /**
- * @Command
+ * Publishes Matrix configuration and migration files to the host project.
  */
 class PublishCommand extends HyperfCommand
 {
-    /**
-     * The name of the command.
-     *
-     * @var string|null
-     */
     protected ?string $name = 'matrix:publish';
 
-    /**
-     * Configure the command.
-     */
     public function configure(): void
     {
         parent::configure();
-        $this->setDescription('Publishes the necessary configurations for the Matrix lib');
+        $this->setDescription('Publishes Matrix config and migration files to your project.');
+        $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite existing files.');
     }
 
-    /**
-     * Handle the execution of the command.
-     */
     public function handle(): void
     {
+        $this->publishConfig();
         $this->publishMigrations();
-        $this->output->writeln('<info>Publication completed!</info>');
+        $this->output->writeln('<info>Matrix: publication completed!</info>');
     }
 
-    /**
-     * Publish the migration files from the Matrix library to the user's project directory.
-     */
+    protected function publishConfig(): void
+    {
+        $source = __DIR__ . '/../../../config/matrix.php';
+        $destination = $this->getProjectRootPath() . '/config/autoload/matrix.php';
+
+        $this->publishFile($source, $destination, 'matrix.php (config)');
+    }
+
     protected function publishMigrations(): void
     {
-        $projectRoot = $this->getProjectRootPath();
-        $migrationsSourcePath = $projectRoot . '/vendor/ananiaslitz/matrix/database/migrations/';
-        $migrationsDestinationPath = $projectRoot . '/migrations/';
+        $source = __DIR__ . '/../../../database/migrations/';
+        $destination = $this->getProjectRootPath() . '/migrations/';
 
-        foreach (['warden', 'tenant'] as $type) {
-            $sourcePath = $migrationsSourcePath . $type;
-            $destinationPath = $migrationsDestinationPath . $type;
+        if (!is_dir($destination)) {
+            mkdir($destination, 0755, true);
+        }
 
-            if (!is_dir($sourcePath)) {
-                $this->output->writeln("<error>Source directory $sourcePath does not exist.</error>");
+        if (!is_dir($source)) {
+            $this->output->writeln("<error>Matrix: migration source directory not found: {$source}</error>");
+            return;
+        }
+
+        foreach (new \DirectoryIterator($source) as $file) {
+            if ($file->isDot() || !$file->isFile()) {
                 continue;
             }
 
-            if (!is_dir($destinationPath)) {
-                mkdir($destinationPath, 0755, true);
-            }
-
-            $files = scandir($sourcePath);
-            foreach ($files as $file) {
-                if ($file === '.' || $file === '..') continue; // Ignora diretórios . e ..
-
-                $srcFile = $sourcePath . '/' . $file;
-                $destFile = $destinationPath . '/' . $file;
-
-                if (!file_exists($destFile) || $this->input->getOption('force')) {
-                    copy($srcFile, $destFile);
-                    $this->output->writeln("<info>Copied: $file</info>");
-                } else {
-                    $this->output->writeln("<comment>Already exists (not overwritten without --force): $file</comment>");
-                }
-            }
+            $this->publishFile(
+                $file->getPathname(),
+                $destination . $file->getFilename(),
+                $file->getFilename()
+            );
         }
     }
 
-    /**
-     * Get the project's root path.
-     *
-     * @return string The path to the project's root directory.
-     */
+    protected function publishFile(string $source, string $destination, string $label): void
+    {
+        $force = $this->input->getOption('force');
+
+        if (!file_exists($source)) {
+            $this->output->writeln("<error>Matrix: source not found: {$source}</error>");
+            return;
+        }
+
+        if (file_exists($destination) && !$force) {
+            $this->output->writeln("<comment>Matrix: already exists (use --force to overwrite): {$label}</comment>");
+            return;
+        }
+
+        $dir = dirname($destination);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        copy($source, $destination);
+        $this->output->writeln("<info>Matrix: published {$label}</info>");
+    }
+
     protected function getProjectRootPath(): string
     {
-        return dirname(__DIR__, 4);
+        return defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 5);
     }
 }
-
