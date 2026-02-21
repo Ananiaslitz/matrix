@@ -12,7 +12,6 @@ class TenantContextTest extends TestCase
 {
     protected function tearDown(): void
     {
-        // Always clean up to avoid test pollution
         TenantContext::clear();
     }
 
