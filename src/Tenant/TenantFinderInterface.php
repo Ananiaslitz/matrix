@@ -1,23 +1,23 @@
 <?php
 
-/**
- * Interface for defining tenant finder implementations.
- *
- * This interface outlines the contract that tenant finder implementations must adhere to. Tenant finder classes are responsible for determining the tenant ID based on an incoming HTTP request in a multi-tenant application.
- *
- * @package Ananiaslitz\Matrix\Tenant
- */
+declare(strict_types=1);
+
 namespace Ananiaslitz\Matrix\Tenant;
 
 use Psr\Http\Message\ServerRequestInterface;
 
+/**
+ * Contract for tenant resolution strategies.
+ *
+ * Returns a fully-hydrated TenantData value object (not a raw ID or Model)
+ * so callers never need to do a second database query.
+ */
 interface TenantFinderInterface
 {
     /**
-     * Find and return the ID of the tenant based on the incoming HTTP request.
+     * Attempt to find the tenant from the incoming request.
      *
-     * @param ServerRequestInterface $request The incoming HTTP request.
-     * @return int|null The ID of the tenant if found; null if not found.
+     * @return TenantData|null Null means this finder cannot identify the tenant.
      */
-    public function findTenantId(ServerRequestInterface $request): ?int;
+    public function findTenant(ServerRequestInterface $request): ?TenantData;
 }
